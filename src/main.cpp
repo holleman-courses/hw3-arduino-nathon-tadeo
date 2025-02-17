@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include "sin_predictor.h"      // Your TFLite model in a C array
+
 #define INPUT_BUFFER_SIZE 64
 #define OUTPUT_BUFFER_SIZE 64
 #define INT_ARRAY_SIZE 8
@@ -7,7 +9,6 @@
 int string_to_array(char *in_str, int *int_array);
 void print_int_array(int *int_array, int array_len);
 int sum_array(int *int_array, int array_len);
-
 
 char received_char = (char)NULL;              
 int chars_avail = 0;                    // input present on terminal
@@ -18,6 +19,7 @@ int input_array[INT_ARRAY_SIZE];        // array of integers input by user
 int in_buff_idx=0; // tracks current input location in input buffer
 int array_length=0;
 int array_sum=0;
+
 
 void setup() {
   // put your setup code here, to run once:
