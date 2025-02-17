@@ -1,14 +1,20 @@
 #include <Arduino.h>
-#include "sin_predictor.h"      // Your TFLite model in a C array
+#include "sin_predictor.h" 
+#include "TensorFlowLite.h"
+#include "tensorflow/lite/micro/all_ops_resolver.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/schema/schema_generated.h"
 
 #define INPUT_BUFFER_SIZE 64
 #define OUTPUT_BUFFER_SIZE 64
 #define INT_ARRAY_SIZE 8
+#define REQUIRED_INPUT_SIZE 7
 
 // put function declarations here:
 int string_to_array(char *in_str, int *int_array);
 void print_int_array(int *int_array, int array_len);
 int sum_array(int *int_array, int array_len);
+void run_tflm_inference(int *int_array);
 
 char received_char = (char)NULL;              
 int chars_avail = 0;                    // input present on terminal
@@ -20,6 +26,15 @@ int in_buff_idx=0; // tracks current input location in input buffer
 int array_length=0;
 int array_sum=0;
 
+// TensorFlow Lite model setup
+constexpr int tensor_arena_size = 2 * 1024; // Adjust memory allocation
+uint8_t tensor_arena[tensor_arena_size];
+
+const tflite::Model* model = nullptr;
+tflite::MicroInterpreter* interpreter = nullptr;
+tflite::AllOpsResolver resolver;
+TfLiteTensor* input_tensor = nullptr;
+TfLiteTensor* output_tensor = nullptr;
 
 void setup() {
   // put your setup code here, to run once:
@@ -29,7 +44,26 @@ void setup() {
   // Serial.println() (appends new-line)  or Serial.print() (no added new-line)
   Serial.println("Test Project waking up");
   memset(in_str_buff, (char)0, INPUT_BUFFER_SIZE*sizeof(char)); 
+   // Load the TensorFlow Lite model
+
+   model = tflite::GetModel(sin_predictor_tflite);
+   if (model->version() != TFLITE_SCHEMA_VERSION) {
+     Serial.println("Model schema version mismatch!");
+     return;
+   }
+
+   static tflite::MicroInterpreter static_interpreter(model, resolver, tensor_arena, tensor_arena_size);
+  interpreter = &static_interpreter;
+
+  if (interpreter->AllocateTensors() != kTfLiteOk) {
+    Serial.println("Failed to allocate TFLM tensors!");
+    return;
+  }
+
+  input_tensor = interpreter->input(0);
+  output_tensor = interpreter->output(0);
 }
+
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -48,12 +82,14 @@ void loop() {
 
       // Process and print out the array
       array_length = string_to_array(in_str_buff, input_array);
-      sprintf(out_str_buff, "Read in  %d integers: ", array_length);
-      Serial.print(out_str_buff);
-      print_int_array(input_array, array_length);
-      array_sum = sum_array(input_array, array_length);
-      sprintf(out_str_buff, "Sums to %d\r\n", array_sum);
-      Serial.print(out_str_buff);
+      if (array_length != REQUIRED_INPUT_SIZE) {
+        Serial.println("Error: Please enter exactly 7 numbers.");
+      } else {
+        Serial.print("Read in numbers: ");
+        print_int_array(input_array, array_length);
+
+        run_tflm_inference(input_array);
+      }
 
       // Now clear the input buffer and reset the index to 0
       memset(in_str_buff, (char)0, INPUT_BUFFER_SIZE*sizeof(char)); 
@@ -65,6 +101,24 @@ void loop() {
     }    
   }
 }
+
+void run_tflm_inference(int *int_array) {
+  Serial.println("Running TensorFlow Lite inference...");
+
+  for (int i = 0; i < REQUIRED_INPUT_SIZE; i++) {
+    input_tensor->data.f[i] = static_cast<float>(int_array[i]);
+  }
+
+  if (interpreter->Invoke() != kTfLiteOk) {
+    Serial.println("TFLM inference failed!");
+    return;
+  }
+
+  float prediction = output_tensor->data.f[0];
+  Serial.print("Prediction result: ");
+  Serial.println(prediction);
+}
+
 
 int string_to_array(char *in_str, int *int_array) {
   int num_integers=0;
