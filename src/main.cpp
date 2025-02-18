@@ -1,6 +1,6 @@
 #include <Arduino.h>
-#include "sin_predictor.h" 
-#include "TensorFlowLite.h"
+#include "sin_predictor.h"  
+#include <TensorFlowLite.h>
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -10,10 +10,12 @@
 #define INT_ARRAY_SIZE 8
 #define REQUIRED_INPUT_SIZE 7
 
+
 // put function declarations here:
 int string_to_array(char *in_str, int *int_array);
 void print_int_array(int *int_array, int array_len);
 int sum_array(int *int_array, int array_len);
+
 void run_tflm_inference(int *int_array);
 
 char received_char = (char)NULL;              
@@ -37,7 +39,7 @@ TfLiteTensor* input_tensor = nullptr;
 TfLiteTensor* output_tensor = nullptr;
 
 void setup() {
-  // put your setup code here, to run once:
+  Serial.begin(9600);
   delay(5000);
   // Arduino does not have a stdout, so printf does not work easily
   // So to print fixed messages (without variables), use 
@@ -45,25 +47,22 @@ void setup() {
   Serial.println("Test Project waking up");
   memset(in_str_buff, (char)0, INPUT_BUFFER_SIZE*sizeof(char)); 
    // Load the TensorFlow Lite model
-
    model = tflite::GetModel(sin_predictor_tflite);
    if (model->version() != TFLITE_SCHEMA_VERSION) {
      Serial.println("Model schema version mismatch!");
      return;
-   }
-
-   static tflite::MicroInterpreter static_interpreter(model, resolver, tensor_arena, tensor_arena_size);
+  }
+  static tflite::MicroInterpreter static_interpreter(model, resolver, tensor_arena, tensor_arena_size);
   interpreter = &static_interpreter;
 
   if (interpreter->AllocateTensors() != kTfLiteOk) {
-    Serial.println("Failed to allocate TFLM tensors!");
-    return;
+  Serial.println("Failed to allocate TFLM tensors!");
+  return;
   }
-
-  input_tensor = interpreter->input(0);
-  output_tensor = interpreter->output(0);
+  
+input_tensor = interpreter->input(0);
+output_tensor = interpreter->output(0);
 }
-
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -101,7 +100,6 @@ void loop() {
     }    
   }
 }
-
 void run_tflm_inference(int *int_array) {
   Serial.println("Running TensorFlow Lite inference...");
 
@@ -119,7 +117,6 @@ void run_tflm_inference(int *int_array) {
   Serial.println(prediction);
 }
 
-
 int string_to_array(char *in_str, int *int_array) {
   int num_integers=0;
   char *token = strtok(in_str, ",");
@@ -136,23 +133,10 @@ int string_to_array(char *in_str, int *int_array) {
 }
 
 void print_int_array(int *int_array, int array_len) {
-  int curr_pos = 0; // track where in the output buffer we're writing
-
-  sprintf(out_str_buff, "Integers: [");
-  curr_pos = strlen(out_str_buff); // so the next write adds to the end
-  for(int i=0;i<array_len;i++) {
-    // sprintf returns number of char's written. use it to update current position
-    curr_pos += sprintf(out_str_buff+curr_pos, "%d, ", int_array[i]);
+  Serial.print("[");
+  for (int i = 0; i < array_len; i++) {
+    Serial.print(int_array[i]);
+    if (i < array_len - 1) Serial.print(", ");
   }
-  sprintf(out_str_buff+curr_pos, "]\r\n");
-  Serial.print(out_str_buff);
-}
-
-int sum_array(int *int_array, int array_len) {
-  int curr_sum = 0; // running sum of the array
-
-  for(int i=0;i<array_len;i++) {
-    curr_sum += int_array[i];
-  }
-  return curr_sum;
+  Serial.println("]");
 }
