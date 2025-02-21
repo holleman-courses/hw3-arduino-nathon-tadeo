@@ -96,7 +96,7 @@ void loop() {
             } else {
                 // Load input into TensorFlow Lite model
                 for (int i = 0; i < EXPECTED_INPUT_SIZE; i++) {
-                    input->data.int8[i] = static_cast<int8_t>(input_array[i]);
+                    input->data.int8[i] = static_cast<int8_t>((input_array[i]-0.0f)*(255.0f/6.0f)-128.0f);
                 }
                 //Time Variables
                 unsigned long t0 = micros();
@@ -107,6 +107,7 @@ void loop() {
                 
                 // Get model output
                 int8_t prediction = output->data.int8[0];
+                prediction = prediction  / 32.0f;
                 Serial.print("Model Prediction: ");
                 Serial.println(prediction);
                             
